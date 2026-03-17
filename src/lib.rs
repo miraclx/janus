@@ -13,12 +13,12 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let incoming_url = req.url()?;
 
     console_log!(
-        "\x1b[34m{}\x1b[39m -> \x1b[36m{}\x1b[39m",
+        "{} -> {}",
         &incoming_url[..url::Position::BeforePath],
         upstream_url
     );
 
-    console_log!("  \x1b[1m> {}\x1b[0m {}", req.method(), incoming_url.path());
+    console_log!("  > {} {}", req.method(), incoming_url.path());
 
     let Ok(mut upstream_segments) = upstream_url.path_segments_mut() else {
         return Err(format!("invalid upstream url: {upstream_url}").into());
@@ -32,20 +32,10 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
     let headers = req.headers().clone();
 
-    for (k, v) in &headers {
-        console_debug!("    > {}={}", k, v);
-    }
-
-    let add_header = |k, v| {
-        console_debug!("    + {}={}", k, v);
-
-        headers.set(k, v)
-    };
-
     let host = &incoming_url[url::Position::BeforeHost..url::Position::AfterPort];
-    add_header("Host", host)?; // workerd overwrites this :-(
-    add_header("X-Forwarded-Host", host)?;
-    add_header("X-Forwarded-Proto", &incoming_url.scheme())?;
+    headers.set("Host", host)?; // workerd overwrites this :-(
+    headers.set("X-Forwarded-Host", host)?;
+    headers.set("X-Forwarded-Proto", &incoming_url.scheme())?;
 
     let mut init = RequestInit::new();
     init.with_method(req.method()).with_headers(headers);
@@ -109,22 +99,13 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     }
 
     console_log!(
-        "  \x1b[1m< {}{}\x1b[22m {}\x1b[0m{}",
-        if status.is_success() {
-            "\x1b[32m"
-        } else {
-            "\x1b[33m"
-        },
+        "  < {} {}{}",
         status.as_u16(),
         status.canonical_reason().unwrap_or("<unknown status code>"),
         (!size_str.is_empty())
             .then(|| format!(" | {size_str}"))
             .unwrap_or_default()
     );
-
-    for (k, v) in res.headers() {
-        console_debug!("    < {}={}", k, v);
-    }
 
     Ok(res)
 }
