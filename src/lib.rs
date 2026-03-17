@@ -42,11 +42,10 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         headers.set(k, v)
     };
 
-    add_header("X-Forwarded-Proto", &incoming_url.scheme())?;
-
     let host = &incoming_url[url::Position::BeforeHost..url::Position::AfterPort];
     add_header("Host", host)?; // workerd overwrites this :-(
     add_header("X-Forwarded-Host", host)?;
+    add_header("X-Forwarded-Proto", &incoming_url.scheme())?;
 
     let mut init = RequestInit::new();
     init.with_method(req.method()).with_headers(headers);
