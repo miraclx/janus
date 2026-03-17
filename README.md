@@ -10,6 +10,11 @@ For local testing:
 
 ```console
 npx wrangler dev
+<..snip>
+http://localhost:8787 -> https://some-website.com
+  > GET /path/to/resource
+  < 200 OK | 256 MiB
+[wrangler:info] GET /path/to/resource 200 OK (381ms)
 ```
 
 Deployment:
