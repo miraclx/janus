@@ -32,11 +32,21 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
     let headers = req.headers().clone();
 
-    headers.set("X-Forwarded-Proto", &incoming_url.scheme())?;
-    headers.set(
-        "X-Forwarded-Host",
-        &incoming_url[url::Position::BeforeHost..url::Position::AfterPort],
-    )?;
+    for (k, v) in &headers {
+        console_debug!("    > {}={}", k, v);
+    }
+
+    let add_header = |k, v| {
+        console_debug!("    + {}={}", k, v);
+
+        headers.set(k, v)
+    };
+
+    add_header("X-Forwarded-Proto", &incoming_url.scheme())?;
+
+    let host = &incoming_url[url::Position::BeforeHost..url::Position::AfterPort];
+    add_header("Host", host)?; // workerd overwrites this :-(
+    add_header("X-Forwarded-Host", host)?;
 
     let mut init = RequestInit::new();
     init.with_method(req.method()).with_headers(headers);
@@ -112,6 +122,10 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             .then(|| format!(" | {size_str}"))
             .unwrap_or_default()
     );
+
+    for (k, v) in res.headers() {
+        console_debug!("    < {}={}", k, v);
+    }
 
     Ok(res)
 }
