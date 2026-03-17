@@ -1,0 +1,15 @@
+[package]
+name = "janus"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+http = "1.4.0"
+http-content-range = "0.2.4"
+url = "2.5.8"
+worker = "0.7"
+worker-macros = "0.7"
+xbytes = "0.1.1"
