@@ -1,4 +1,4 @@
-.env
+.dev.vars
 target
 node_modules
 .wrangler
