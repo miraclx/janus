@@ -11,10 +11,23 @@ For local testing:
 ```console
 npx wrangler dev
 <..snip>
-http://localhost:8787 -> https://some-website.com
-  > GET /path/to/resource
-  < 200 OK | 256 MiB
-[wrangler:info] GET /path/to/resource 200 OK (381ms)
+{
+  method: 'GET',
+  from: 'http://localhost:8787/path/to/resource',
+  to: 'https://some-website.com/path/to/resource',
+  code: 206,
+  status: '206 Partial Content',
+  range: '1045438755-1393918339/1742397926',
+  size_dec: '348.47 MB',
+  size_iec: '332.33 MiB',
+  size_bytes: 348479585,
+  total_dec: '1.74 GB',
+  total_iec: '1.62 GiB',
+  total_bytes: 1742397926,
+  path: '/path/to/resource',
+  message: 'GET | 206 Partial Content | 332.33 MiB | 1.62 GiB | /path/to/resource'
+}
+[wrangler:info] GET /path/to/resource 206 Partial Content (381ms)
 ```
 
 Deployment:
