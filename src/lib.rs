@@ -19,12 +19,7 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let item = js_sys::Object::new();
     let mut message = String::new();
 
-    let ip = req
-        .headers()
-        .get("CF-Connecting-IP")
-        .ok()
-        .flatten();
-
+    let ip = req.headers().get("CF-Connecting-IP").ok().flatten();
     let ua = req.headers().get("User-Agent").ok().flatten();
 
     let raw_cf = js_sys::Reflect::get(req.inner().as_ref(), &"cf".into())
