@@ -1,7 +1,6 @@
-use sha2::{Digest, Sha256};
-
 use http::StatusCode;
 use http_content_range::ContentRange;
+use sha2::{Digest, Sha256};
 use worker::wasm_bindgen::JsValue;
 use worker::{
     Context, Env, Fetch, Headers, Method, Request, RequestInit, Response, Result, Url, event,
@@ -21,14 +20,6 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
     let ip = req.headers().get("CF-Connecting-IP").ok().flatten();
     let ua = req.headers().get("User-Agent").ok().flatten();
-
-    let raw_cf = js_sys::Reflect::get(req.inner().as_ref(), &"cf".into())
-        .ok()
-        .filter(|v| !v.is_undefined() && !v.is_null());
-
-    if let Some(ref raw_cf) = raw_cf {
-        web_sys::console::log_2(&"[debug] cf:".into(), raw_cf);
-    }
 
     let cf = req.cf();
 
@@ -101,6 +92,10 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         log(None, &[("id.network", &net.as_str().into())]);
     }
 
+    let raw_cf = js_sys::Reflect::get(req.inner().as_ref(), &"cf".into())
+        .ok()
+        .filter(|v| !v.is_undefined() && !v.is_null());
+
     let cf_str = |key: &str| {
         raw_cf
             .as_ref()
@@ -111,10 +106,18 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     // SHA-256 of tls_ciphers:tls_exts:tls_hello_len:ua — stable per OS/TLS stack + device type
     let fingerprint = {
         let mut parts: Vec<String> = Vec::new();
-        if let Some(v) = cf_str("tlsClientCiphersSha1") { parts.push(v); }
-        if let Some(v) = cf_str("tlsClientExtensionsSha1") { parts.push(v); }
-        if let Some(v) = cf_str("tlsClientHelloLength") { parts.push(v); }
-        if let Some(ref v) = ua { parts.push(v.clone()); }
+        if let Some(v) = cf_str("tlsClientCiphersSha1") {
+            parts.push(v);
+        }
+        if let Some(v) = cf_str("tlsClientExtensionsSha1") {
+            parts.push(v);
+        }
+        if let Some(v) = cf_str("tlsClientHelloLength") {
+            parts.push(v);
+        }
+        if let Some(ref v) = ua {
+            parts.push(v.clone());
+        }
         (!parts.is_empty()).then(|| {
             let hash = Sha256::digest(parts.join(":").as_bytes());
             hash.iter().map(|b| format!("{b:02x}")).collect::<String>()
@@ -310,4 +313,3 @@ fn truncate_path(p: &str) -> String {
 
     out
 }
-
