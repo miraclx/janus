@@ -148,8 +148,8 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .expect("must be a string");
 
     let path_args = &[
-        (".path", &truncate_path(&path_decoded).into()),
-        ("url.path", &path_decoded.into()),
+        ("url.path.short", &truncate_path(&path_decoded).into()),
+        ("url.path.full", &path_decoded.into()),
     ];
 
     let res = match res {
@@ -157,7 +157,7 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         Err(err) => {
             log(Some(".code"), &[(".code", &"ERR".into())]);
             log(Some("error"), &[("error", &err.to_string().into())]);
-            log(Some(".path"), path_args);
+            log(Some("url.path.short"), path_args);
 
             return Err(err);
         }
@@ -212,7 +212,10 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         log(
             Some("content.size.iec"),
             &[
-                ("content.size.dec", &size.repr(Mode::Decimal).to_string().into()),
+                (
+                    "content.size.dec",
+                    &size.repr(Mode::Decimal).to_string().into(),
+                ),
                 ("content.size.iec", &size.to_string().into()),
                 ("content.size.bytes", &size_bytes),
             ],
@@ -229,14 +232,17 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         log(
             key,
             &[
-                ("content.total.dec", &size.repr(Mode::Decimal).to_string().into()),
+                (
+                    "content.total.dec",
+                    &size.repr(Mode::Decimal).to_string().into(),
+                ),
                 ("content.total.iec", &size.to_string().into()),
                 ("content.total.bytes", &total_bytes),
             ],
         );
     }
 
-    log(Some(".path"), path_args);
+    log(Some("url.path.short"), path_args);
 
     js_sys::Reflect::set(&item, &"message".into(), &message.into())?;
 
