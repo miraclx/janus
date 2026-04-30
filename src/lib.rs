@@ -66,7 +66,7 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     };
 
     if let Some(ref ip) = ip {
-        log(Some("source.ip"), &[("source.ip", &ip.as_str().into())]);
+        log(None, &[("source.ip", &ip.as_str().into())]);
     }
 
     if let Some(ref ua) = ua {
