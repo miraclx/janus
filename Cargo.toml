@@ -8,6 +8,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 http = "1.4.0"
+sha2 = { version = "0.10", default-features = false }
 http-content-range = "0.2.4"
 url = "2.5.8"
 worker = "0.7"

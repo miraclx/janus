@@ -1,3 +1,5 @@
+use sha2::{Digest, Sha256};
+
 use http::StatusCode;
 use http_content_range::ContentRange;
 use worker::wasm_bindgen::JsValue;
@@ -63,6 +65,8 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         log(None, &[("ua", &ua.as_str().into())]);
     }
 
+    let asn = cf.and_then(|cf| cf.asn());
+
     if let Some(cf) = cf {
         if let Some(country) = cf.country() {
             log(None, &[("country", &country.into())]);
@@ -75,7 +79,20 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         }
     }
 
-    // JA3-like fingerprint: stable per OS/TLS stack, consistent across sessions on same device
+    // SHA-256 of ip:asn — changes with network/connection
+    let network = match (ip.as_deref(), asn) {
+        (Some(ip), Some(asn)) => Some(format!("{ip}:{asn}")),
+        (Some(ip), None) => Some(ip.to_string()),
+        _ => None,
+    }
+    .map(|raw| {
+        let hash = Sha256::digest(raw.as_bytes());
+        hash.iter().map(|b| format!("{b:02x}")).collect::<String>()
+    });
+    if let Some(ref net) = network {
+        log(None, &[("network", &net.as_str().into())]);
+    }
+
     let cf_str = |key: &str| {
         raw_cf
             .as_ref()
@@ -83,19 +100,27 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             .and_then(|v| v.as_string())
     };
 
-    let fingerprint = match (
-        cf_str("tlsClientCiphersSha1"),
-        cf_str("tlsClientExtensionsSha1"),
-        cf_str("tlsClientHelloLength"),
-    ) {
-        (Some(c), Some(e), Some(l)) => Some(format!("{c}:{e}:{l}")),
-        (Some(c), Some(e), None) => Some(format!("{c}:{e}")),
-        _ => None,
+    // SHA-256 of tls_ciphers:tls_exts:tls_hello_len:ua — stable per OS/TLS stack + device type
+    let fingerprint = {
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(v) = cf_str("tlsClientCiphersSha1") { parts.push(v); }
+        if let Some(v) = cf_str("tlsClientExtensionsSha1") { parts.push(v); }
+        if let Some(v) = cf_str("tlsClientHelloLength") { parts.push(v); }
+        if let Some(ref v) = ua { parts.push(v.clone()); }
+        (!parts.is_empty()).then(|| {
+            let hash = Sha256::digest(parts.join(":").as_bytes());
+            hash.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        })
     };
-
     if let Some(ref fp) = fingerprint {
         log(None, &[("fingerprint", &fp.as_str().into())]);
     }
+
+    let headers_obj = js_sys::Object::new();
+    for (name, value) in req.headers() {
+        let _ = js_sys::Reflect::set(&headers_obj, &name.into(), &value.into());
+    }
+    let _ = js_sys::Reflect::set(&item, &"headers".into(), &headers_obj);
 
     let res = proxy(
         &incoming_url,
