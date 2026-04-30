@@ -32,8 +32,6 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
     let cf = req.cf();
 
-    // let mut cache = BTreeMap::new();
-
     let mut log = |mut a: Option<&_>, b: &[(&str, &JsValue)]| {
         for (k, v) in b {
             if a.take_if(|k_| k_ == k).is_some() {
@@ -48,12 +46,27 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
                 continue;
             }
 
-            let _ignored = js_sys::Reflect::set(&item, &(*k).into(), v);
+            let mut segments = k.split('.');
+            let leaf = segments.next_back().unwrap();
+            let mut cur: JsValue = item.clone().into();
+            for seg in segments {
+                let seg_key = JsValue::from(seg);
+                let child = js_sys::Reflect::get(&cur, &seg_key)
+                    .ok()
+                    .filter(|v| v.is_object() && !v.is_null())
+                    .unwrap_or_else(|| {
+                        let obj: JsValue = js_sys::Object::new().into();
+                        let _ = js_sys::Reflect::set(&cur, &seg_key, &obj);
+                        obj
+                    });
+                cur = child;
+            }
+            let _ignored = js_sys::Reflect::set(&cur, &JsValue::from(leaf), v);
         }
     };
 
     if let Some(ref ip) = ip {
-        log(Some("ip"), &[("ip", &ip.as_str().into())]);
+        log(Some("source.ip"), &[("source.ip", &ip.as_str().into())]);
     }
 
     if let Some(ref ua) = ua {
@@ -64,13 +77,13 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
     if let Some(cf) = cf {
         if let Some(country) = cf.country() {
-            log(None, &[("country", &country.into())]);
+            log(None, &[("location.country", &country.into())]);
         }
         if let Some(city) = cf.city() {
-            log(None, &[("city", &city.into())]);
+            log(None, &[("location.city", &city.into())]);
         }
         if let Some(org) = cf.as_organization() {
-            log(None, &[("org", &org.into())]);
+            log(None, &[("source.org", &org.into())]);
         }
     }
 
@@ -85,7 +98,7 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         hash.iter().map(|b| format!("{b:02x}")).collect::<String>()
     });
     if let Some(ref net) = network {
-        log(None, &[("network", &net.as_str().into())]);
+        log(None, &[("id.network", &net.as_str().into())]);
     }
 
     let cf_str = |key: &str| {
@@ -108,7 +121,7 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         })
     };
     if let Some(ref fp) = fingerprint {
-        log(None, &[("fingerprint", &fp.as_str().into())]);
+        log(None, &[("id.device", &fp.as_str().into())]);
     }
 
     let headers_obj = js_sys::Object::new();
@@ -133,7 +146,7 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 
     let path_args = &[
         (".path", &truncate_path(&path_decoded).into()),
-        ("path", &path_decoded.into()),
+        ("url.path", &path_decoded.into()),
     ];
 
     let res = match res {
@@ -194,16 +207,16 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             js_sys::Number::try_from(bytes).map_or_else(|_| bytes.to_string().into(), Into::into);
 
         log(
-            Some("size_iec"),
+            Some("size.iec"),
             &[
-                ("size_dec", &size.repr(Mode::Decimal).to_string().into()),
-                ("size_iec", &size.to_string().into()),
-                ("size_bytes", &size_bytes),
+                ("size.dec", &size.repr(Mode::Decimal).to_string().into()),
+                ("size.iec", &size.to_string().into()),
+                ("size.bytes", &size_bytes),
             ],
         );
     }
 
-    let key = (size != bytes).then_some("total_iec");
+    let key = (size != bytes).then_some("total.iec");
     if let Some(bytes) = bytes {
         let size = ByteSize::from_bytes(bytes as _);
 
@@ -213,9 +226,9 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         log(
             key,
             &[
-                ("total_dec", &size.repr(Mode::Decimal).to_string().into()),
-                ("total_iec", &size.to_string().into()),
-                ("total_bytes", &total_bytes),
+                ("total.dec", &size.repr(Mode::Decimal).to_string().into()),
+                ("total.iec", &size.to_string().into()),
+                ("total.bytes", &total_bytes),
             ],
         );
     }
@@ -239,7 +252,7 @@ pub async fn proxy(
 ) -> Result<Response> {
     log(Some("method"), &[("method", &method.as_ref().into())]);
 
-    log(None, &[("from", &incoming_url.as_str().into())]);
+    log(None, &[("url.from", &incoming_url.as_str().into())]);
 
     let Ok(mut upstream_segments) = upstream_url.path_segments_mut() else {
         return Err(format!("invalid upstream url: {upstream_url}").into());
@@ -251,7 +264,7 @@ pub async fn proxy(
 
     drop(upstream_segments);
 
-    log(None, &[("to", &upstream_url.as_str().into())]);
+    log(None, &[("url.to", &upstream_url.as_str().into())]);
 
     let headers = headers.clone();
 
@@ -297,3 +310,4 @@ fn truncate_path(p: &str) -> String {
 
     out
 }
+
