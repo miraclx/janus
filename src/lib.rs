@@ -23,10 +23,14 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .ok()
         .flatten();
 
-    if let Ok(raw_cf) = js_sys::Reflect::get(req.inner().as_ref(), &"cf".into()) {
-        if !raw_cf.is_undefined() && !raw_cf.is_null() {
-            web_sys::console::log_2(&"[debug] cf:".into(), &raw_cf);
-        }
+    let ua = req.headers().get("User-Agent").ok().flatten();
+
+    let raw_cf = js_sys::Reflect::get(req.inner().as_ref(), &"cf".into())
+        .ok()
+        .filter(|v| !v.is_undefined() && !v.is_null());
+
+    if let Some(ref raw_cf) = raw_cf {
+        web_sys::console::log_2(&"[debug] cf:".into(), raw_cf);
     }
 
     let cf = req.cf();
@@ -55,14 +59,42 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         log(Some("ip"), &[("ip", &ip.as_str().into())]);
     }
 
+    if let Some(ref ua) = ua {
+        log(None, &[("ua", &ua.as_str().into())]);
+    }
+
     if let Some(cf) = cf {
         if let Some(country) = cf.country() {
             log(None, &[("country", &country.into())]);
         }
-        log(None, &[("colo", &cf.colo().into())]);
-        if let Some(asn) = cf.asn() {
-            log(None, &[("asn", &asn.into())]);
+        if let Some(city) = cf.city() {
+            log(None, &[("city", &city.into())]);
         }
+        if let Some(org) = cf.as_organization() {
+            log(None, &[("org", &org.into())]);
+        }
+    }
+
+    // JA3-like fingerprint: stable per OS/TLS stack, consistent across sessions on same device
+    let cf_str = |key: &str| {
+        raw_cf
+            .as_ref()
+            .and_then(|cf| js_sys::Reflect::get(cf, &key.into()).ok())
+            .and_then(|v| v.as_string())
+    };
+
+    let fingerprint = match (
+        cf_str("tlsClientCiphersSha1"),
+        cf_str("tlsClientExtensionsSha1"),
+        cf_str("tlsClientHelloLength"),
+    ) {
+        (Some(c), Some(e), Some(l)) => Some(format!("{c}:{e}:{l}")),
+        (Some(c), Some(e), None) => Some(format!("{c}:{e}")),
+        _ => None,
+    };
+
+    if let Some(ref fp) = fingerprint {
+        log(None, &[("fingerprint", &fp.as_str().into())]);
     }
 
     let res = proxy(
