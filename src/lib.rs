@@ -56,25 +56,25 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         }
     };
 
+    let asn = cf.and_then(|cf| cf.asn());
+
     if let Some(ref ip) = ip {
-        log(None, &[("source.ip", &ip.as_str().into())]);
+        log(None, &[("client.ip", &ip.as_str().into())]);
     }
 
     if let Some(ref ua) = ua {
-        log(None, &[("ua", &ua.as_str().into())]);
+        log(None, &[("client.ua", &ua.as_str().into())]);
     }
-
-    let asn = cf.and_then(|cf| cf.asn());
 
     if let Some(cf) = cf {
         if let Some(country) = cf.country() {
-            log(None, &[("location.country", &country.into())]);
+            log(None, &[("client.country", &country.into())]);
         }
         if let Some(city) = cf.city() {
-            log(None, &[("location.city", &city.into())]);
+            log(None, &[("client.city", &city.into())]);
         }
         if let Some(org) = cf.as_organization() {
-            log(None, &[("source.org", &org.into())]);
+            log(None, &[("client.org", &org.into())]);
         }
     }
 
@@ -177,7 +177,7 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         .as_deref()
         .and_then(|r| {
             if let Some(("bytes", r)) = r.split_once(" ") {
-                log(None, &[("range", &r.into())]);
+                log(None, &[("content.range", &r.into())]);
             }
 
             ContentRange::parse(r)
@@ -210,16 +210,16 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             js_sys::Number::try_from(bytes).map_or_else(|_| bytes.to_string().into(), Into::into);
 
         log(
-            Some("size.iec"),
+            Some("content.size.iec"),
             &[
-                ("size.dec", &size.repr(Mode::Decimal).to_string().into()),
-                ("size.iec", &size.to_string().into()),
-                ("size.bytes", &size_bytes),
+                ("content.size.dec", &size.repr(Mode::Decimal).to_string().into()),
+                ("content.size.iec", &size.to_string().into()),
+                ("content.size.bytes", &size_bytes),
             ],
         );
     }
 
-    let key = (size != bytes).then_some("total.iec");
+    let key = (size != bytes).then_some("content.total.iec");
     if let Some(bytes) = bytes {
         let size = ByteSize::from_bytes(bytes as _);
 
@@ -229,9 +229,9 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         log(
             key,
             &[
-                ("total.dec", &size.repr(Mode::Decimal).to_string().into()),
-                ("total.iec", &size.to_string().into()),
-                ("total.bytes", &total_bytes),
+                ("content.total.dec", &size.repr(Mode::Decimal).to_string().into()),
+                ("content.total.iec", &size.to_string().into()),
+                ("content.total.bytes", &total_bytes),
             ],
         );
     }
