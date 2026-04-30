@@ -17,6 +17,22 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let item = js_sys::Object::new();
     let mut message = String::new();
 
+    let ip = req
+        .headers()
+        .get("CF-Connecting-IP")
+        .ok()
+        .flatten();
+
+    if let Ok(raw_cf) = js_sys::Reflect::get(req.inner().as_ref(), &"cf".into()) {
+        if !raw_cf.is_undefined() && !raw_cf.is_null() {
+            web_sys::console::log_2(&"[debug] cf:".into(), &raw_cf);
+        }
+    }
+
+    let cf = req.cf();
+
+    // let mut cache = BTreeMap::new();
+
     let mut log = |mut a: Option<&_>, b: &[(&str, &JsValue)]| {
         for (k, v) in b {
             if a.take_if(|k_| k_ == k).is_some() {
@@ -34,6 +50,20 @@ pub async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             let _ignored = js_sys::Reflect::set(&item, &(*k).into(), v);
         }
     };
+
+    if let Some(ref ip) = ip {
+        log(Some("ip"), &[("ip", &ip.as_str().into())]);
+    }
+
+    if let Some(cf) = cf {
+        if let Some(country) = cf.country() {
+            log(None, &[("country", &country.into())]);
+        }
+        log(None, &[("colo", &cf.colo().into())]);
+        if let Some(asn) = cf.asn() {
+            log(None, &[("asn", &asn.into())]);
+        }
+    }
 
     let res = proxy(
         &incoming_url,
